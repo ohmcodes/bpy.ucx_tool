@@ -11,6 +11,9 @@ Automatically creates profile collision for UE FBX Import
 4. Locate the zip 
 5. Enjoy
 
+![image](https://github.com/user-attachments/assets/09db0f25-588b-43e3-81d4-48422b1102de)
+
+
 ## How to use it
 ### Check the official docs regarding UCX [visit](https://dev.epicgames.com/documentation/en-us/unreal-engine/fbx-static-mesh-pipeline?application_version=4.27)
 
