@@ -13,50 +13,37 @@ bl_info = {
 }
 
 def create_collision_box(collection):
-    # Ensure an object is selected
     if bpy.context.selected_objects:
-        # Get the selected object
         selected_obj = bpy.context.selected_objects[0]
         
-        # Enter object mode and deselect all
         bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.select_all(action='DESELECT')
         
-        # Select the object again
         selected_obj.select_set(True)
         bpy.context.view_layer.objects.active = selected_obj
         
-        # Duplicate the object and create a bounding box
         bpy.ops.object.duplicate()
         temp_obj = bpy.context.selected_objects[0]
         
-        # Enter edit mode and select all vertices
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
         
-        # Create a convex hull (bounding box)
         bpy.ops.mesh.convex_hull()
         
-        # Return to object mode
         bpy.ops.object.mode_set(mode='OBJECT')
         
-        # Rename the object for Unreal Engine collision
         temp_obj.name = f"UCX_{selected_obj.name}_00"
         
-        # Optionally, apply the scale and rotation
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
         
-        # Add the collision box to the specified collection
         if collection:
             collection.objects.link(temp_obj)
-            # Unlink from the default collection if necessary
             for col in temp_obj.users_collection:
                 if col != collection:
                     col.objects.unlink(temp_obj)
                     
         temp_obj.hide_set(True)
         
-        # Deselect all and select the original object
         bpy.ops.object.select_all(action='DESELECT')
         selected_obj.select_set(True)
         bpy.context.view_layer.objects.active = selected_obj
@@ -66,12 +53,9 @@ def create_collision_box(collection):
         print("No object selected. Please select a mesh object.")
 
 def get_vertex_count(obj, vg):
-    # Initialize a counter for vertices in the group
     vertex_count = 0
 
-    # Iterate over all vertices in the object
     for v in obj.data.vertices:
-        # Check if the vertex belongs to the vertex group
         if vg.index in [g.group for g in v.groups]:
             vertex_count += 1
 
@@ -90,15 +74,12 @@ def check_selected_vertices(obj):
         return False
 
 def create_new_name(collection, obj_name):
-    # Define the base name pattern
     obj_name = obj_name.replace(r'.(\d{3})','')
     base_name_pattern = fr"UCX_{obj_name}_(\d{{2}})"
     current_number = "00"
 
-    # List to store objects that match the base name pattern
     matching_objects = []
 
-    # Iterate through all objects in the scene
     for cobj in collection.objects:
         match = re.match(base_name_pattern, cobj.name)
         print(cobj.name)
@@ -107,11 +88,9 @@ def create_new_name(collection, obj_name):
             print(f"current_number from matching: {current_number}")
             matching_objects.append((cobj, current_number))
 
-    # Function to get the next number
     def get_next_number(current_number):
         return f"{int(current_number) + 1:02d}"
 
-    # Print the matching objects and their next numbers
     if matching_objects:
         for cobj, current_number in matching_objects:
             next_number = get_next_number(current_number)
@@ -124,14 +103,10 @@ def create_new_name(collection, obj_name):
 
 def clean_names(collection):
     res = 0
-    # Iterate over all objects in the collection
     for i, obj in enumerate(collection.objects, 1):
-        # Check if the object name ends with ".000"
-        
         if re.search(r'\.\d{3}$', obj.name):
             old_name = obj.name
             print(f"Original Object name {old_name}")
-            #print(f"Found suffix {obj.name}")
             new_name = re.sub(r'\.\d{3}$', '', obj.name)
             print(f"Renamed to {new_name}")
             obj.name = new_name
@@ -176,10 +151,8 @@ def create_collision_from_vertex_groups(collection, obj):
         if not selected_verts:
             raise Exception("No vertices selected!")
 
-        # Extract the selected vertices
         selected_verts = [v for v in obj.data.vertices if v.select]
         
-        # Create a new mesh and object
         new_mesh_name = f"UCX_{obj.name}_{i:02d}"
         new_mesh = bpy.data.meshes.new(new_mesh_name)
 
@@ -195,7 +168,6 @@ def create_collision_from_vertex_groups(collection, obj):
         new_obj = bpy.data.objects.new(new_mesh_name, new_mesh)
         
         new_bm = bmesh.new()
-        # Add the selected vertices to the new BMesh
         for v in selected_verts:
             #print(type(v))
             new_bm.verts.new(v.co)
@@ -203,17 +175,14 @@ def create_collision_from_vertex_groups(collection, obj):
         new_bm.to_mesh(new_mesh)
         new_bm.free()
         
-        # Return to object mode
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        # Copy the transform (location, rotation, scale) from the original object
         new_obj.location = obj.location
         new_obj.rotation_euler = obj.rotation_euler
         new_obj.scale = obj.scale
 
         if collection:
             collection.objects.link(new_obj)
-            # Unlink from the default collection if necessary
             for col in new_obj.users_collection:
                 if col != collection:
                     col.objects.unlink(new_obj)
@@ -224,7 +193,6 @@ def create_collision_from_vertex_groups(collection, obj):
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
         
-        # Call the convex hull operator on the selected vertices
         bpy.ops.mesh.convex_hull(delete_unused=True, use_existing_faces=True, make_holes=False, join_triangles=True)
 
         new_obj.name = re.sub(r'\.\d{3}$', '', new_obj.name)
@@ -244,29 +212,23 @@ def create_collision_from_selected_vertices(collection, obj):
         raise Exception("Selected object is not a mesh!")
     
     preserve_selected = bpy.context.view_layer.objects.active
-    # Ensure we are in object mode
     bpy.ops.object.mode_set(mode='OBJECT')
 
     new_mesh_name = create_new_name(collection, obj.name)
 
-    # Create a new mesh and object
     new_mesh = bpy.data.meshes.new(new_mesh_name)
     new_obj = bpy.data.objects.new(new_mesh_name, new_mesh)
     
-    # Enter edit mode and get the selected vertices
     bpy.ops.object.mode_set(mode='EDIT')
     bm = bmesh.from_edit_mesh(obj.data)
     
-    # Get the selected vertices
     selected_verts = [v for v in bm.verts if v.select]
 
     if not selected_verts:
         raise Exception("No vertices selected!")
     
-    # Create a new BMesh for the new mesh
     new_bm = bmesh.new()
 
-    # Add the selected vertices to the new BMesh
     for v in selected_verts:
         #print(type(v))
         new_bm.verts.new(v.co)
@@ -274,22 +236,17 @@ def create_collision_from_selected_vertices(collection, obj):
     # Add the selected vertices to the new BMesh
     #[new_bm.verts.new(v.co) for v in selected_verts]
 
-    # Update the new mesh with the new BMesh
     new_bm.to_mesh(new_mesh)
     new_bm.free()
 
-    # Return to object mode
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    # Copy the transform (location, rotation, scale) from the original object
     new_obj.location = obj.location
     new_obj.rotation_euler = obj.rotation_euler
     new_obj.scale = obj.scale
 
-    # Add the collision box to the specified collection
     if collection:
         collection.objects.link(new_obj)
-        # Unlink from the default collection if necessary
         for col in new_obj.users_collection:
             if col != collection:
                 col.objects.unlink(new_obj)
@@ -300,12 +257,7 @@ def create_collision_from_selected_vertices(collection, obj):
 
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
-    
-    # Call the convex hull operator on the selected vertices
     bpy.ops.mesh.convex_hull(delete_unused=True, use_existing_faces=True, make_holes=False, join_triangles=True)
-    
-    #old_int = int("00")
-    #print(f"old int 00 {old_int+1:02d}")
     
     print(f"Created collision box: {new_obj.name}")
     new_obj.name = re.sub(r'\.\d{3}$', '', new_obj.name)
@@ -322,7 +274,6 @@ def create_vertex_group_from_selection(obj):
     if not obj.vertex_groups:
         group_name = f"UCX_{obj.name}_00"
     else:
-        # Find the next available increment
         existing_groups = [vg.name for vg in obj.vertex_groups if vg.name.startswith(f"UCX_{obj.name}_")]
         if existing_groups:
             valid_numbers = []
@@ -351,12 +302,10 @@ class COLLISION_OT_CreateCollection(bpy.types.Operator):
     bl_idname = "collision.create_collection"
     
     def execute(self, context):
-        # Create a new collection
         new_collection = bpy.data.collections.new("CollisionCollection")
         bpy.context.scene.collection.children.link(new_collection)
         context.scene.collision_collection = new_collection.name
         
-        # Force UI redraw
         context.area.tag_redraw()
         return {'FINISHED'}         
 
@@ -365,7 +314,6 @@ class COLLISION_OT_CreateFromObject(bpy.types.Operator):
     bl_idname = "collision.create_from_object"
     
     def execute(self, context):
-        # Get the selected collection
         collection_name = context.scene.collision_collection
         collection = bpy.data.collections.get(collection_name)
         
@@ -373,10 +321,8 @@ class COLLISION_OT_CreateFromObject(bpy.types.Operator):
             self.report({'ERROR'}, "No collection selected!")
             return {'CANCELLED'}
         
-        # Call the function to create the collision box
         create_collision_box(collection)
         
-        # Redraw UI
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -385,7 +331,6 @@ class COLLISION_OT_CreateFromVGroups(bpy.types.Operator):
     bl_idname = "collision.create_from_vgroups"
     
     def execute(self, context):
-        # Get the selected collection
         collection_name = context.scene.collision_collection
         collection = bpy.data.collections.get(collection_name)
         
@@ -402,11 +347,8 @@ class COLLISION_OT_CreateFromVGroups(bpy.types.Operator):
         #for vg in obj.vertex_groups:
         #    if "UCX_" in vg.name:
         
-        # Call the function to create the collision box
-        #create_collision_box(collection)
         create_collision_from_vertex_groups(collection, obj)
         
-        # Redraw UI
         context.area.tag_redraw()
         return {'FINISHED'}
     
@@ -415,7 +357,6 @@ class COLLISION_OT_CreateFromSelectedVertices(bpy.types.Operator):
     bl_idname = "collision.create_from_selectedvert"
     
     def execute(self, context):
-        # Get the selected collection
         collection_name = context.scene.collision_collection
         collection = bpy.data.collections.get(collection_name)
         
@@ -432,12 +373,9 @@ class COLLISION_OT_CreateFromSelectedVertices(bpy.types.Operator):
         if not check_selected_vertices(obj):
             self.report({'ERROR'}, "No vertices selected! Or Select two or more")
             return {'CANCELLED'}
-        
-        
-        
+
         create_collision_from_selected_vertices(collection, obj)
         
-        # Redraw UI
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -462,7 +400,6 @@ class COLLISION_OT_FetchVG(bpy.types.Operator):
         
         context.scene.vertex_group_items.clear()
         
-        # Add a new entry for each vertex group
         for vg in obj.vertex_groups:
             vertex_count = get_vertex_count(obj, vg)
 
@@ -482,7 +419,6 @@ class COLLISION_OT_CreateFromVGList(bpy.types.Operator):
     bl_idname = "collision.create_from_vglist"
     
     def execute(self, context):
-        # Get the selected collection
         collection_name = context.scene.collision_collection
         collection = bpy.data.collections.get(collection_name)
         
@@ -498,7 +434,6 @@ class COLLISION_OT_CreateFromVGList(bpy.types.Operator):
 
         create_collision_from_vertex_groups(collection, obj)
         
-        # Redraw UI
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -547,7 +482,6 @@ class COLLISION_UL_UCXChecbox(bpy.types.PropertyGroup):
         default = True
     )
 
-# Operator to add a vertex group
 class COLLISION_OT_CreateVertexGroup(bpy.types.Operator):
     bl_label = "Add Selected to Vertex Group"
     bl_idname = "collision.create_vertex_group"
@@ -565,18 +499,15 @@ class COLLISION_OT_CreateVertexGroup(bpy.types.Operator):
         bm = bmesh.from_edit_mesh(obj.data)
         selected_vertices = [v for v in bm.verts if v.select]
         if len(selected_vertices) >= 3:
-            # Create a new vertex group
             group_name = create_vertex_group_from_selection(obj)
             self.report({'INFO'}, f"Created vertex group: {group_name}")
             bpy.ops.wm.save_mainfile()
 
-        # Force UI redraw
         context.area.tag_redraw()
         
         return {'FINISHED'}
 
 # Not using
-# Operator to remove a vertex group
 class COLLISION_OT_RemoveVertexGroup(bpy.types.Operator):
     bl_label = "Remove Vertex Group"
     bl_idname = "collision.remove_vertex_group"
@@ -591,11 +522,9 @@ class COLLISION_OT_RemoveVertexGroup(bpy.types.Operator):
             self.report({'ERROR'}, "Selected object is not a mesh!")
             return {'CANCELLED'}
         
-        # Remove the active vertex group
         if obj.vertex_groups:
             obj.vertex_groups.remove(obj.vertex_groups[obj.vertex_groups.active_index])
         
-        # Force UI redraw
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -640,7 +569,6 @@ class COLLISION_PT_Panel(bpy.types.Panel):
                     objectButtonsRow = layout.row()
                     objectButtonsCol = objectButtonsRow.column()
                     objectButtonsCol.label(text="Create From: ")
-                    # Button to create the collision box
                     objectButtonsRow.operator("collision.create_from_object", text="Object")
 
                     if len(obj.vertex_groups) > 0:

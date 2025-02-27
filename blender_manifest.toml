@@ -1,0 +1,10 @@
+schema_version = "1.0.0"
+id = "UCX_CustomCollision_Tool"
+version = "1.0.0"
+name = "Unreal Engine Custom Collision Tool (UCX)"
+tagline = "Automatically creates profile collision for UE FBX Import"
+maintainer = "ohmcodes"
+type = "add-on"
+tags = ["Modeling"]
+blender_version_min = "4.3.2"
+license = ['SPDX:GPL-3.0-or-later']
