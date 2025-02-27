@@ -1,5 +1,4 @@
-# bpy.ucx_tool
-Unreal Engine Custom Collision Tool (UCX)
+# Unreal Engine Custom Collision Blender Addon Tool (UCX)
 
 Automatically creates profile collision for UE FBX Import
 
