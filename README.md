@@ -5,11 +5,12 @@ Automatically creates profile collision for UE FBX Import
 # PLEASE ⭐STAR⭐ THE REPO IF YOU LIKE IT! THANKS!
 
 ## Installations:
-1. Navigate to top left `Menus > Edit > Preferrences > Add-ons`
-2. Click the button at the top right (down icon)
-3. Click `Install from disk...`
-4. Locate the zip 
-5. Enjoy
+1. Download [latest version](https://github.com/ohmcodes/bpy.ucx_tool/releases/latest)
+2. Navigate to top left `Menus > Edit > Preferrences > Add-ons`
+3. Click the button at the top right (down icon)
+4. Click `Install from disk...`
+5. Locate the zip 
+6. Enjoy
 
 ![image](https://github.com/user-attachments/assets/09db0f25-588b-43e3-81d4-48422b1102de)
 
