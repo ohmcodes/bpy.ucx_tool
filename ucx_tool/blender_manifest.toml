@@ -2,8 +2,8 @@ schema_version = "1.0.0"
 
 # Example of manifest file for a Blender extension
 # Change the values according to your extension
-id = "ucx_tool"
-version = "1.0.0"
+id = "UCX_CustomCollision_Tool"
+version = "2.0.0"
 name = "Unreal Engine Custom Collision Tool (UCX)"
 tagline = "Automatically creates profile collision UCX for UE FBX Import"
 maintainer = "ohmcodes"
