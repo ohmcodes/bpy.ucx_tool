@@ -14,6 +14,7 @@
 import bpy
 import bmesh
 import re
+from mathutils import Vector
 from bpy.types import Operator, Panel, PropertyGroup
 from bpy.props import StringProperty, EnumProperty, BoolProperty, IntProperty, CollectionProperty, PointerProperty
 from bpy.app.handlers import persistent
@@ -22,7 +23,7 @@ bl_info = {
     "name": "Unreal Engine Custom Collision Tool (UCX)",
     "description": "Automatically creates profile collision UCX for UE FBX Import",
     "author": "ohmcodes",
-    "version": (2, 0, 0),
+    "version": (2, 0, 1),
     "blender": (4, 3, 2),
     "location": "View3D > Right panel",
     "category": "UCX",
@@ -107,8 +108,28 @@ def add_to_vertex_groups(obj):
 
 def fetch_vg(scene):
     obj = bpy.context.active_object
+
+    # Check if an object is selected
+    if not obj:
+        #print("No object selected.")
+        return
+
+    # Check if the object is hidden in the viewport or outliner
+    if obj.hide_get() or obj.hide_viewport:
+        #print(f"Object '{obj.name}' is hidden.")
+        return
     
-    scene.vertex_group_items.clear()
+    # Check if the object is a mesh
+    if obj.type != 'MESH':
+        #print(f"Object '{obj.name}' is not a mesh.")
+        return
+
+    if not obj.vertex_groups:
+        #print("Object has no groups")
+        return
+
+    if scene.vertex_group_items:
+        scene.vertex_group_items.clear()
     
     for vg in obj.vertex_groups:
         vertex_count = get_vertex_count(obj, vg)
@@ -123,18 +144,69 @@ def fetch_vg(scene):
         item.vertex_group_name = vg.name
 
 def vg_validations(context):
-    valid = False
+    valid = True
 
-    if context.active_object and context.active_object.type == 'MESH' and context.selected_objects and len(context.scene.vertex_group_items) > 0 or len(context.active_object.vertex_groups) > 0:
-        valid = True
+    active_object = context.scene.last_active_object
 
-    if context.scene.ucx_chkbox.ucx_chkbox and [vg for vg in context.active_object.vertex_groups if "UCX_" not in vg.name]:
-        valid = False
+    if not active_object:
+        #print("active_object is not valid")
+        return False
+    
+    if active_object.type != 'MESH':
+        #print("object is not a mesh")
+        return False
 
-    if context.scene.ucx_chkbox.ucx_chkbox and [vg for vg in context.active_object.vertex_groups if "UCX_" in vg.name]:
-        valid = True
+    if active_object.hide_get():
+        #print("object is hidden")
+        return False
+
+    if len(active_object.vertex_groups) == 0:
+        #print("object is has no vg")
+        return False
+
+    if context.scene.ucx_chkbox.ucx_chkbox and [vg for vg in active_object.vertex_groups if "UCX_" not in vg.name]:
+        #print("object select UCX only and object has no UCX vg")
+        return False
 
     return valid
+
+def clean_up_object_data(obj):
+    """Remove unnecessary data from the object."""
+    if obj.type != 'MESH':
+        return
+    
+    mesh = obj.data
+    
+    # Clear materials
+    mesh.materials.clear()
+    
+    # Clear vertex groups
+    if obj.vertex_groups:
+        obj.vertex_groups.clear()
+    
+    # Clear shape keys
+    if mesh.shape_keys:
+        mesh.shape_keys.key_blocks.clear()
+    
+    # Clear UV maps
+    if mesh.uv_layers:
+        for uv_layer in mesh.uv_layers:
+            mesh.uv_layers.remove(uv_layer)
+    
+    # Clear custom normals
+    #mesh.use_auto_smooth = False
+    #mesh.normals_split_custom_set([])
+    
+    # Clear vertex colors
+    if mesh.vertex_colors:
+        for vcol in mesh.vertex_colors:
+            mesh.vertex_colors.remove(vcol)
+    
+    # Clear geometry data (optional)
+    #mesh.clear_geometry()
+    
+    print(f"Cleaned up data for object: {obj.name}")
+
 
 # Collision Creation Functions
 def create_collision_box(collection, obj):
@@ -165,7 +237,53 @@ def create_collision_box(collection, obj):
     new_obj.scale = obj.scale
 
     new_obj.hide_set(True)
+
+    # Clean up unnecessary data
+    clean_up_object_data(new_obj)
+
     print(f"Created collision box: {new_obj.name}")
+
+def create_bounding_box_cube(collection, obj):
+    """Create a convex hull using the bounding box of the selected object."""
+    if obj.type != 'MESH':
+        raise Exception("Selected object is not a mesh!")
+    
+    # Get the bounding box corners in world coordinates
+    #bbox_corners = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    # Get the bounding box corners in local coordinates
+    bbox_corners = [Vector(corner) for corner in obj.bound_box]
+    
+    # Create a new mesh and object for the convex hull
+    new_mesh = bpy.data.meshes.new(create_new_name(collection, obj.name))
+    new_obj = bpy.data.objects.new(new_mesh.name, new_mesh)
+    collection.objects.link(new_obj)
+    
+    # Create a bmesh and add the bounding box corners as vertices
+    bm = bmesh.new()
+    for corner in bbox_corners:
+        bm.verts.new(corner)
+    
+    # Create the convex hull from the bounding box vertices
+    bmesh.ops.convex_hull(bm, input=bm.verts, use_existing_faces=False)
+    
+    # Write the bmesh data to the mesh
+    bm.to_mesh(new_mesh)
+    bm.free()
+    
+    # Match the location, rotation, and scale of the original object
+    new_obj.location = obj.location
+    new_obj.rotation_euler = obj.rotation_euler
+    new_obj.scale = obj.scale
+    
+    # Ensure the convex hull object's origin matches the original object's origin
+    new_obj.matrix_world = obj.matrix_world
+
+    new_obj.hide_set(True)
+
+    # Clean up unnecessary data
+    clean_up_object_data(new_obj)
+
+    print(f"Created convex hull from bounds: {new_obj.name}")
 
 def create_collision_from_vertex_groups(collection, context, isFromList = False):
     """Create collision meshes from vertex groups."""
@@ -209,6 +327,10 @@ def create_collision_from_vertex_groups(collection, context, isFromList = False)
         new_obj.scale = obj.scale
         
         new_obj.hide_set(True)
+
+        # Clean up unnecessary data
+        clean_up_object_data(new_obj)
+
         print(f"Created collision box: {new_obj.name}")
 
 def create_collision_from_selected_vertices(collection, obj):
@@ -237,6 +359,10 @@ def create_collision_from_selected_vertices(collection, obj):
     new_obj.scale = obj.scale
     
     new_obj.hide_set(True)
+
+    # Clean up unnecessary data
+    clean_up_object_data(new_obj)
+    
     print(f"Created collision box: {new_obj.name}")
 
 # Operators
@@ -267,8 +393,11 @@ class UCX_OT_CreateFromObject(Operator):
             return {'CANCELLED'}
         
         for s_obj in context.selected_objects:
-            create_collision_box(collection, s_obj)
-
+            if context.scene.ucx_chkbox_bounding.ucx_chkbox_bounding:
+                create_bounding_box_cube(collection, s_obj)
+            else:
+                create_collision_box(collection, s_obj)
+            
 
         return {'FINISHED'}
 
@@ -394,6 +523,7 @@ class UCX_OT_FetchVG(bpy.types.Operator):
 class UCX_OT_CreateFromVGList(bpy.types.Operator):
     bl_label = "From Custom VG List"
     bl_idname = "object.create_from_vglist"
+    bl_description = "Still Fetch all existing VG but has ability to remove unwanted group"
     
     @classmethod
     def poll(cls, context):
@@ -433,6 +563,13 @@ class UCX_UL_UCXCheckbox(bpy.types.PropertyGroup):
         default = True
     )
 
+class UCX_UL_UCXCheckboxBounding(bpy.types.PropertyGroup):
+    ucx_chkbox_bounding : bpy.props.BoolProperty(
+        name="Bounding Box",
+        description="Create Collision from selected object bounding box",
+        default = False
+    )
+
 class UCX_PG_VertexGroupItems(bpy.types.PropertyGroup):
     vertex_group_name: bpy.props.StringProperty(name="Vertex Group Name")
 
@@ -454,10 +591,18 @@ class UCX_PT_Panel(Panel):
         
         layout.label(text="Generate Collisions:")
 
+        layout.separator()
+        
+        layout.prop(scene.ucx_chkbox_bounding, "ucx_chkbox_bounding", text="Bounding Box")
+
         layout.operator("object.create_from_object")
+
+        layout.separator()
+
         layout.operator("object.create_from_selectedvert")
+
         layout.operator("object.create_from_vgroups")
-        layout.operator("object.create_from_vglist")  
+        layout.operator("object.create_from_vglist")
 
         layout.separator()
 
@@ -500,6 +645,7 @@ classes = (
     UCX_OT_CreateFromVGList,
     UCX_OT_RemoveVGEntry,
     UCX_UL_UCXCheckbox,
+    UCX_UL_UCXCheckboxBounding,
     UCX_UL_VGField,
     UCX_PG_VertexGroupItems,
     UCX_PT_Panel,
@@ -515,6 +661,8 @@ def register():
     )
 
     bpy.types.Scene.ucx_chkbox = bpy.props.PointerProperty(type=UCX_UL_UCXCheckbox)
+
+    bpy.types.Scene.ucx_chkbox_bounding = bpy.props.PointerProperty(type=UCX_UL_UCXCheckboxBounding)
 
     bpy.types.Scene.vertex_group_items = bpy.props.CollectionProperty(type=UCX_PG_VertexGroupItems)
 
@@ -533,6 +681,7 @@ def unregister():
     
     del bpy.types.Scene.ucx_collection
     del bpy.types.Scene.ucx_chkbox
+    del bpy.types.Scene.ucx_chkbox_bounding
     del bpy.types.Scene.vertex_group_items
 
     if on_selection_changed in bpy.app.handlers.depsgraph_update_post:
