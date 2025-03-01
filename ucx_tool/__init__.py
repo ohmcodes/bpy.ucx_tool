@@ -488,7 +488,7 @@ class UCX_OT_AddToVertexGroup(bpy.types.Operator):
             group_name = add_to_vertex_groups(obj)
             self.report({'INFO'}, f"Created vertex group: {group_name}")
             # save the file to reflect assignment
-            bpy.ops.wm.save_mainfile()
+            #bpy.ops.wm.save_mainfile()
 
         context.area.tag_redraw()
         
